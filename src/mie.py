@@ -80,22 +80,33 @@ def single_layer_mie(radius, m_rel, wavelengths, n_medium=1.0):
 
     return Q_sca, Q_abs
 
-def core_shell_mie(radius_core, radius_shell, m_core, m_shell, wavelengths, n_medium=1.0):
+def core_shell_mie(radius_core, radius_shell, m_core, m_shell,
+                   wavelengths, n_medium=1.0):
     """
     Compute Q_sca and Q_abs for a sphere with:
       • a core of radius_core & index m_core
-      • a shell extending to radius_shell with index m_shell
+      • a shell out to radius_shell with index m_shell
       • embedded in medium of index n_medium
     """
-    # size parameters for core & shell
+    # Part 1: size parameters for core & shell
     x_core  = 2 * np.pi * radius_core * n_medium / wavelengths
     x_shell = 2 * np.pi * radius_shell * n_medium / wavelengths
 
-    # refractive‐index ratios
-    m1 = m_core  / n_medium
-    m2 = m_shell / n_medium
+    # Part 2: multipole cutoff based on the shell size parameter
+    #    one cutoff per λ, then pick the largest
+    n_max_array = np.round(x_shell + 4 * x_shell**(1/3) + 2).astype(int)
+    n_max = int(n_max_array.max())
 
-    # placeholder storage (we’ll overwrite in the next step)
+    # Part 3: pre‐allocate coefficient arrays
+    #    a_core/b_core for the inner boundary, a/b for the outer
+    a_core = np.zeros((n_max, len(wavelengths)), dtype=complex)
+    b_core = np.zeros_like(a_core)
+    a      = np.zeros_like(a_core)
+    b      = np.zeros_like(a_core)
+
+    # (matching logic will go here in the next step)
+
+    # for now, keep returning zeros so the stub still passes your test
     Q_sca = np.zeros_like(wavelengths, dtype=float)
     Q_abs = np.zeros_like(wavelengths, dtype=float)
 
