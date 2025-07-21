@@ -80,6 +80,27 @@ def single_layer_mie(radius, m_rel, wavelengths, n_medium=1.0):
 
     return Q_sca, Q_abs
 
+def core_shell_mie(radius_core, radius_shell, m_core, m_shell, wavelengths, n_medium=1.0):
+    """
+    Compute Q_sca and Q_abs for a sphere with:
+      • a core of radius_core & index m_core
+      • a shell extending to radius_shell with index m_shell
+      • embedded in medium of index n_medium
+    """
+    # size parameters for core & shell
+    x_core  = 2 * np.pi * radius_core * n_medium / wavelengths
+    x_shell = 2 * np.pi * radius_shell * n_medium / wavelengths
+
+    # refractive‐index ratios
+    m1 = m_core  / n_medium
+    m2 = m_shell / n_medium
+
+    # placeholder storage (we’ll overwrite in the next step)
+    Q_sca = np.zeros_like(wavelengths, dtype=float)
+    Q_abs = np.zeros_like(wavelengths, dtype=float)
+
+    return Q_sca, Q_abs
+
 
 if __name__ == "__main__":
     radius = 50e-9           # 50 nm
@@ -90,6 +111,16 @@ if __name__ == "__main__":
     Q_sca, Q_abs = single_layer_mie(radius, m_rel, wavelengths)
     print("Q_sca:", Q_sca)
     print("Q_abs:", Q_abs)
+
+Q_sca2, Q_abs2 = core_shell_mie(
+    radius_core=40e-9,
+    radius_shell=60e-9,
+    m_core=1.6+0.2j,
+    m_shell=1.4+0.05j,
+    wavelengths=wavelengths
+)
+print("core–shell Q_sca:", Q_sca2)
+print("core–shell Q_abs:", Q_abs2)
 
 
 
