@@ -31,3 +31,14 @@ best_prof, best_sca, best_abs = opt.optimize_shell(
 print("optimizer best_profile:", best_prof)
 print("optimizer Q_sca:", best_sca)
 print("optimizer Q_abs:", best_abs)
+
+opt = Optimizer(solver)
+init_profile = np.linspace(1.4, 1.6, num=2)   # 2-zone profile matches GA’s num_genes
+best_prof, best_sca, best_abs = opt.optimize_shell(
+    target_peaks=[650e-9, 900e-9],
+    initial_profile=init_profile,
+    wavelengths=wavelengths,
+)
+print("optimizer best_profile:", best_prof)
+print("optimizer Q_sca:", best_sca)
+print("optimizer Q_abs:", best_abs)
