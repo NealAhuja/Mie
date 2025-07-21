@@ -110,6 +110,60 @@ def core_shell_mie(radius_core, radius_shell, m_core, m_shell,
     Q_sca = np.zeros_like(wavelengths, dtype=float)
     Q_abs = np.zeros_like(wavelengths, dtype=float)
 
+    # Part 4: compute the coefficients
+    for i, lam in enumerate(wavelengths):
+        x1 = x_core[i]
+        x2 = x_shell[i]
+        m1 = m_core / n_medium
+        m2 = m_shell / n_medium
+
+        # for each multipole order n…
+        for n in range(1, n_max + 1):
+            # --- Core–Shell interface αₙ ---
+            u1 = m1 * x1
+            u2 = m2 * x1
+
+            psi_u1 = psi(n, u1)
+            psi_u1_p = deriv(psi, n, u1)
+            psi_u2 = psi(n, u2)
+            psi_u2_p = deriv(psi, n, u2)
+            xi_u2 = xi(n, u2)
+            xi_u2_p = deriv(xi, n, u2)
+
+            alpha = (m2 * psi_u2 * psi_u1_p - m1 * psi_u1 * psi_u2_p) \
+                    / (m2 * xi_u2 * psi_u1_p - m1 * psi_u1 * xi_u2_p)
+
+            # --- Shell–Medium interface aₙ, bₙ ---
+            v = x2
+            w = m2 * x2
+
+            psi_v = psi(n, v)
+            psi_v_p = deriv(psi, n, v)
+            xi_v = xi(n, v)
+            xi_v_p = deriv(xi, n, v)
+            psi_w = psi(n, w)
+            psi_w_p = deriv(psi, n, w)
+
+            num_a = m2 * psi_w * (psi_v_p - alpha * xi_v_p) \
+                    - psi_v * (psi_w_p - alpha * xi_u2_p)
+            den_a = m2 * psi_w * (xi_v_p - alpha * xi_v_p) \
+                    - xi_v * (psi_w_p - alpha * xi_u2_p)
+            a[n - 1, i] = num_a / den_a
+
+            num_b = psi_w * (psi_v_p - m2 * alpha * xi_v_p) \
+                    - m2 * psi_v * (psi_w_p - alpha * xi_u2_p)
+            den_b = psi_w * (xi_v_p - m2 * alpha * xi_v_p) \
+                    - m2 * xi_v * (psi_w_p - alpha * xi_u2_p)
+            b[n - 1, i] = num_b / den_b
+
+    # Part 5: sum efficiencies
+    orders = np.arange(1, n_max+1)[:, None]
+    fact   = (2*orders + 1)
+
+    Q_sca = (2/(x_shell**2)) * np.sum(fact * (np.abs(a)**2 + np.abs(b)**2), axis=0)
+    Q_ext = (2/(x_shell**2)) * np.sum(fact * np.real(a + b), axis=0)
+    Q_abs = Q_ext - Q_sca
+
     return Q_sca, Q_abs
 
 
