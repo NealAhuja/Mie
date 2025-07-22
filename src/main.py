@@ -38,5 +38,16 @@ def main():
     print("optimizer Q_abs:", best_abs)
     print("fitness history:", history)
 
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(6,4))
+    plt.plot(np.arange(1, len(history)+1), history, marker='o')
+    plt.xlabel("Generation")
+    plt.ylabel("Best Q_sca at 650 nm")
+    plt.title("GA Convergence")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
 if __name__ == "__main__":
     main()
