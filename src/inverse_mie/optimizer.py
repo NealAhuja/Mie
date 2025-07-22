@@ -17,78 +17,60 @@ class Optimizer:
             wavelengths: np.ndarray,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
-        GA‐based shell optimization, returning:
-          best_profile, best_Q_sca, best_Q_abs, fitness_history
+        GA‐based optimization of:
+          [core_index, shell_index, shell_thickness_nm]
+        Returns best_profile, Q_sca, Q_abs, fitness_history
         """
         target = target_peaks[0]
         fitness_history = []
 
-        # 3‐arg fitness function
         def fitness_func(ga, solution, idx):
-            m_core_val = solution[0]
-            m_shell_val = solution[-1]
+            n_core = solution[0]
+            n_shell = solution[1]
+            t_shell = solution[2]  # thickness in nm
+            r_core = 40e-9  # fixed core radius
+            r_shell = r_core + t_shell * 1e-9
+
             Q_sca, _ = self.solver.core_shell(
-                radius_core=40e-9,
-                radius_shell=60e-9,
-                m_core=m_core_val + 0j,
-                m_shell=m_shell_val + 0j,
+                radius_core=r_core,
+                radius_shell=r_shell,
+                m_core=n_core + 0j,
+                m_shell=n_shell + 0j,
                 wavelengths=wavelengths,
             )
-            # fitness = Q_sca at the target λ
             i = np.argmin(np.abs(wavelengths - target))
             return Q_sca[i]
 
-        # record best fitness each generation
         def on_generation(ga):
-            best_fit = ga.best_solution()[1]
-            fitness_history.append(best_fit)
+            fitness_history.append(ga.best_solution()[1])
 
         ga = pygad.GA(
             num_generations=30,
             sol_per_pop=10,
             num_parents_mating=4,
             fitness_func=fitness_func,
-            num_genes=initial_profile.size,
-            gene_space=[{"low": 1.3, "high": 1.7}] * initial_profile.size,
+            num_genes=3,
+            gene_space=[
+                {"low": 1.3, "high": 1.7},  # core index
+                {"low": 1.3, "high": 1.7},  # shell index
+                {"low": 5.0, "high": 80.0},  # shell thickness in nm
+            ],
             mutation_percent_genes=20,
             on_generation=on_generation
         )
         ga.run()
 
-        best_solution, _, _ = ga.best_solution()
+        best_sol, _, _ = ga.best_solution()
+        # unpack and compute full spectra
+        n_core_opt, n_shell_opt, t_shell_opt = best_sol
+        r_core = 40e-9
+        r_shell = r_core + t_shell_opt * 1e-9
         best_Q_sca, best_Q_abs = self.solver.core_shell(
-            radius_core=40e-9,
-            radius_shell=60e-9,
-            m_core=best_solution[0] + 0j,
-            m_shell=best_solution[-1] + 0j,
+            radius_core=r_core,
+            radius_shell=r_shell,
+            m_core=n_core_opt + 0j,
+            m_shell=n_shell_opt + 0j,
             wavelengths=wavelengths,
         )
 
-        return best_solution, best_Q_sca, best_Q_abs, np.array(fitness_history)
-
-        """
-        Run a simple genetic‐algorithm to optimize a 2‐zone (core+shell) profile
-        for maximizing scattering at the first target peak wavelength.
-        """
-
-        ga = pygad.GA(
-            num_generations=30,
-            sol_per_pop=10,
-            num_parents_mating=4,
-            fitness_func=fitness_func,
-            num_genes=initial_profile.size,
-            gene_space=[{"low": 1.3, "high": 1.7}] * initial_profile.size,
-            mutation_percent_genes=20,
-        )
-
-        ga.run()
-        best_solution, best_fitness, _ = ga.best_solution()
-
-        best_Q_sca, best_Q_abs = self.solver.core_shell(
-            radius_core=40e-9,
-            radius_shell=60e-9,
-            m_core=best_solution[0] + 0j,
-            m_shell=best_solution[-1] + 0j,
-            wavelengths=wavelengths,
-        )
-        return best_solution, best_Q_sca, best_Q_abs
+        return best_sol, best_Q_sca, best_Q_abs, np.array(fitness_history)

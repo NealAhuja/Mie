@@ -3,6 +3,19 @@ from inverse_mie.solver import MieSolver
 from inverse_mie.optimizer import Optimizer
 
 def main():
+    import sys
+
+    # 1) Ask the user for their medium (default to 1.0)
+    try:
+        n_med = float(input("Enter medium refractive index (e.g. 1.0 for air, 1.33 for water): ") or 1.0)
+    except ValueError:
+        print("Invalid number, using n_medium=1.0")
+        n_med = 1.0
+
+    # 2) Initialize solver with that medium index
+    solver = MieSolver(n_medium=n_med)
+
+
     # Initialize the solver
     solver = MieSolver()
 
@@ -25,17 +38,17 @@ def main():
     print("core-shell Q_sca:", core_sca)
     print("core-shell Q_abs:", core_abs)
 
-    # 3) GA optimizer test (2-zone profile)
+    # test optimizer stub (3-gene: core_n, shell_n, shell_thickness_nm)
     opt = Optimizer(solver)
-    init_profile = np.linspace(1.4, 1.6, num=2)  # 2 genes: core index & shell index
+    init_profile = np.array([1.5, 1.4, 20.0])  # start with a 20 nm shell
     best_prof, best_sca, best_abs, history = opt.optimize_shell(
-        target_peaks=[650e-9, 900e-9],
+        target_peaks=[650e-9],
         initial_profile=init_profile,
         wavelengths=wavelengths
     )
-    print("optimizer best_profile:", best_prof)
-    print("optimizer Q_sca:", best_sca)
-    print("optimizer Q_abs:", best_abs)
+    print("optimized [n_core, n_shell, shell_thickness_nm]:", best_prof)
+    print("Q_sca:", best_sca)
+    print("Q_abs:", best_abs)
     print("fitness history:", history)
 
     import matplotlib.pyplot as plt
