@@ -38,8 +38,9 @@ class Optimizer:
                 m_shell2=n_sh2 + 0j,
                 wavelengths=wavelengths,
             )
-            idx = np.argmin(np.abs(wavelengths - target_peaks[0]))
-            return Q_sca[idx]
+            i0 = np.argmin(np.abs(wavelengths - target_peaks[0]))
+            i1 = np.argmin(np.abs(wavelengths - target_peaks[1]))
+            return 0.5 * (Q_sca[i0] + Q_sca[i1])
 
         def on_generation(ga):
             fitness_history.append(ga.best_solution()[1])

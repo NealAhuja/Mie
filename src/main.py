@@ -51,6 +51,11 @@ def main():
         initial_profile=init_profile,
         wavelengths=wavelengths
     )
+    print("Optimized for 650 nm & 900 nm:")
+    print(" best profile:", best)
+    print(" Q_sca:", sca)  # now length-2 array
+    print(" Q_abs:", abs_)
+
     print("optimized [n_core, n_sh1, n_sh2, r_core_nm, t1_nm, t2_nm]:", best)
     print("Q_sca:", sca)
     print("Q_abs:", abs_)
@@ -74,13 +79,46 @@ def main():
     plt.figure(figsize=(6,4))
     plt.plot(np.arange(1, len(hist) + 1), hist, marker='o')
     plt.xlabel("Generation")
-    plt.ylabel("Best Q_sca at 650 nm")
+    plt.ylabel("Best avg Q_sca (650 & 900 nm)")
     plt.title("GA Convergence")
     plt.grid(True)
     plt.tight_layout()
     plt.show()
 
+    # --- design‐rule sweep: vary first peak, fix second at 900 nm ---
+    first_peaks = np.linspace(500e-9, 800e-9, 7)  # 500,550,...,800 nm
+    fixed_second = 900e-9
+    sweep_results = []
 
+    for peak in first_peaks:
+        bp, bq_sca, bq_abs, _ = opt.optimize_shell(
+            target_peaks=[peak, fixed_second],
+            initial_profile=init_profile,
+            wavelengths=wavelengths
+        )
+        # record [first_peak_nm, core_n, shell1_n, shell2_n, r_core, t1, t2]
+        sweep_results.append([
+            peak * 1e9,  # in nm
+            *bp  # unpack your 6-gene vector
+        ])
+
+    sweep_array = np.array(sweep_results)
+    # columns: [peak_nm, n_core, n_sh1, n_sh2, r_core_nm, t1_nm, t2_nm]
+
+    print("\nSweep results (first_peak_nm vs. optimized genes):")
+    print(sweep_array)
+
+    import matplotlib.pyplot as plt
+
+    plt.figure()
+    plt.plot(sweep_array[:, 0], sweep_array[:, 4], 'o-')  # core radius vs. peak
+    plt.plot(sweep_array[:, 0], sweep_array[:, 5], 's-')  # shell1 thickness
+    plt.plot(sweep_array[:, 0], sweep_array[:, 6], '^-')  # shell2 thickness
+    plt.xlabel("Target Peak #1 (nm)")
+    plt.ylabel("Optimized thickness (nm)")
+    plt.legend(["core radius", "shell1 t", "shell2 t"])
+    plt.title("Design Rules: thickness vs. LSPR")
+    plt.show()
 
 
 if __name__ == "__main__":
