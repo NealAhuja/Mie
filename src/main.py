@@ -38,18 +38,18 @@ def main():
     print("core-shell Q_sca:", core_sca)
     print("core-shell Q_abs:", core_abs)
 
-    # test optimizer stub (3-gene: core_n, shell_n, shell_thickness_nm)
     opt = Optimizer(solver)
-    init_profile = np.array([1.5, 1.4, 20.0])  # start with a 20 nm shell
-    best_prof, best_sca, best_abs, history = opt.optimize_shell(
+    # 5‐gene profile: [core_n, shell1_n, shell2_n, shell1_thickness_nm, shell2_thickness_nm]
+    init_profile = np.array([1.5, 1.4, 1.5, 20.0, 20.0])
+    best, sca, abs_, hist = opt.optimize_shell(
         target_peaks=[650e-9],
         initial_profile=init_profile,
         wavelengths=wavelengths
     )
-    print("optimized [n_core, n_shell, shell_thickness_nm]:", best_prof)
-    print("Q_sca:", best_sca)
-    print("Q_abs:", best_abs)
-    print("fitness history:", history)
+    print("optimized [n_core, n_sh1, n_sh2, t1_nm, t2_nm]:", best)
+    print("Q_sca:", sca)
+    print("Q_abs:", abs_)
+    print("fitness history:", hist)
 
     # 2-shell test (core + 2 shells)
     Q2_sca, Q2_abs = solver.double_shell(
@@ -67,7 +67,7 @@ def main():
     import matplotlib.pyplot as plt
 
     plt.figure(figsize=(6,4))
-    plt.plot(np.arange(1, len(history)+1), history, marker='o')
+    plt.plot(np.arange(1, len(hist) + 1), hist, marker='o')
     plt.xlabel("Generation")
     plt.ylabel("Best Q_sca at 650 nm")
     plt.title("GA Convergence")
