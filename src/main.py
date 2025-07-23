@@ -5,6 +5,23 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 def main():
+    solver = MieSolver(n_medium=1.0)
+    wavelengths = np.linspace(400e-9, 1000e-9, 7)
+
+    # Baseline check: single-layer
+    Q_sca_single, Q_abs_single = solver.single_layer(50e-9, 1.5 + 0.1j, wavelengths)
+    print("Single-layer Q_sca sample:", Q_sca_single[:5])
+
+    # Baseline check: core-shell
+    core_sca, core_abs = solver.core_shell(
+        radius_core=40e-9, radius_shell=60e-9,
+        m_core=1.6 + 0.2j, m_shell=1.4 + 0.05j,
+        wavelengths=wavelengths
+    )
+    print("Core-shell Q_sca sample:", core_sca[:5])
+
+
+
     # 1) Medium refractive index
     n_med = 1.00
     print("Medium Index:", n_med)
@@ -113,6 +130,63 @@ def main():
     plt.ylabel("Optimized size (nm)")
     plt.title("Design Rules (linear fits)")
     plt.legend(loc="best")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    # --- full-spectra plotting ---
+    # use the same solver you already initialized
+    # (solver = MieSolver(n_medium=n_med) earlier in main)
+
+    # 1) Define a fine wavelength grid
+    wavelengths = np.linspace(400e-9, 1000e-9, 200)
+
+    # 2) Compute baseline spectra
+    Q_sca_single, Q_abs_single = solver.single_layer(50e-9, 1.5 + 0.1j, wavelengths)
+    core_sca, core_abs = solver.core_shell(
+        radius_core=40e-9, radius_shell=60e-9,
+        m_core=1.6 + 0.2j, m_shell=1.4 + 0.05j,
+        wavelengths=wavelengths
+    )
+
+    # 3) Compute optimized double-shell from your best_profile
+    best_profile = best  # from your GA run above
+    n_core, n_sh1, n_sh2, r_core_nm, t1_nm, t2_nm = best_profile
+    r_core = r_core_nm * 1e-9
+    r_sh1 = r_core + t1_nm * 1e-9
+    r_sh2 = r_sh1 + t2_nm * 1e-9
+    opt_sca, opt_abs = solver.double_shell(
+        radius_core=r_core,
+        radius_shell1=r_sh1,
+        radius_shell2=r_sh2,
+        m_core=n_core + 0j,
+        m_shell1=n_sh1 + 0j,
+        m_shell2=n_sh2 + 0j,
+        wavelengths=wavelengths
+    )
+
+    # 4) Plot Q_sca
+    plt.figure(figsize=(6, 4))
+    plt.plot(wavelengths * 1e9, Q_sca_single, label="Single-layer")
+    plt.plot(wavelengths * 1e9, core_sca, label="Core-shell")
+    plt.plot(wavelengths * 1e9, opt_sca, label="Optimized double-shell")
+    plt.xlabel("Wavelength (nm)")
+    plt.ylabel("Scattering $Q_{sca}$")
+    plt.title("Full Spectra Comparison")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    # 5) Plot Q_abs
+    plt.figure(figsize=(6, 4))
+    plt.plot(wavelengths * 1e9, Q_abs_single, label="Single-layer")
+    plt.plot(wavelengths * 1e9, core_abs, label="Core-shell")
+    plt.plot(wavelengths * 1e9, opt_abs, label="Optimized double-shell")
+    plt.xlabel("Wavelength (nm)")
+    plt.ylabel("Absorption $Q_{abs}$")
+    plt.title("Full Spectra Comparison")
+    plt.legend()
     plt.grid(True)
     plt.tight_layout()
     plt.show()
