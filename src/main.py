@@ -69,6 +69,23 @@ def main():
     print("\nSweep results:")
     print(df.to_string(index=False))
 
+    x = df["peak_nm"].values  # in nm
+
+    # Pick the columns you want to fit
+    y_core = df["r_core_nm"].values
+    y_t1 = df["t1_nm"].values
+    y_t2 = df["t2_nm"].values
+
+    # Fit linear models (degree=1)
+    p_core = np.polyfit(x, y_core, deg=1)  # [slope, intercept]
+    p_t1 = np.polyfit(x, y_t1, deg=1)
+    p_t2 = np.polyfit(x, y_t2, deg=1)
+
+    print("\nDesign‐rule coefficients (slope, intercept):")
+    print(f" Core radius vs. peak:      {p_core}")
+    print(f" Shell1 thickness vs. peak: {p_t1}")
+    print(f" Shell2 thickness vs. peak: {p_t2}")
+
     # 9) Design‐rule plot (thickness vs. peak)
     plt.figure()
     plt.plot(df["peak_nm"], df["r_core_nm"], "o-", label="core radius")
@@ -80,6 +97,26 @@ def main():
     plt.title("Design Rules: layer thickness vs. LSPR")
     plt.tight_layout()
     plt.show()
+
+    # 11) Overlay linear fits
+    plt.figure(figsize=(6, 4))
+    plt.plot(x, y_core, "o", label="data: core radius")
+    plt.plot(x, np.polyval(p_core, x), "-", label=f"fit: r_core = {p_core[0]:.3f}·peak + {p_core[1]:.1f}")
+
+    plt.plot(x, y_t1, "s", label="data: shell1 t")
+    plt.plot(x, np.polyval(p_t1, x), "--", label=f"fit: t1 = {p_t1[0]:.3f}·peak + {p_t1[1]:.1f}")
+
+    plt.plot(x, y_t2, "^", label="data: shell2 t")
+    plt.plot(x, np.polyval(p_t2, x), "-.", label=f"fit: t2 = {p_t2[0]:.3f}·peak + {p_t2[1]:.1f}")
+
+    plt.xlabel("Target Peak #1 (nm)")
+    plt.ylabel("Optimized size (nm)")
+    plt.title("Design Rules (linear fits)")
+    plt.legend(loc="best")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
 
 if __name__ == "__main__":
     main()
