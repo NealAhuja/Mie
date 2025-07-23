@@ -1,5 +1,6 @@
 import numpy as np
 from scipy import special
+from typing import Tuple
 
 class MieSolver:
     def __init__(self, n_medium=1.0):
@@ -151,6 +152,95 @@ class MieSolver:
         fact = (2 * orders + 1)
         Q_sca = (2 / (x_shell ** 2)) * np.sum(fact * (np.abs(a) ** 2 + np.abs(b) ** 2), axis=0)
         Q_ext = (2 / (x_shell ** 2)) * np.sum(fact * np.real(a + b), axis=0)
+        Q_abs = Q_ext - Q_sca
+
+        return Q_sca, Q_abs
+
+    def double_shell(
+        self,
+        radius_core: float,
+        radius_shell1: float,
+        radius_shell2: float,
+        m_core: complex,
+        m_shell1: complex,
+        m_shell2: complex,
+        wavelengths: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute Q_sca and Q_abs for a sphere with
+          • core of radius_core & index m_core
+          • shell1 out to radius_shell1 with index m_shell1
+          • shell2 out to radius_shell2 with index m_shell2
+          • embedded in medium of index self.n_medium
+        """
+        # 1) size parameters
+        x1 = 2*np.pi*radius_core   * self.n_medium / wavelengths
+        x2 = 2*np.pi*radius_shell1 * self.n_medium / wavelengths
+        x3 = 2*np.pi*radius_shell2 * self.n_medium / wavelengths
+
+        # 2) relative indices
+        m1 = m_core   / self.n_medium
+        m2 = m_shell1 / self.n_medium
+        m3 = m_shell2 / self.n_medium
+
+        # 3) multipole cutoff based on outer shell size
+        n_max = int(np.round(x3 + 4*x3**(1/3) + 2).max())
+
+        # 4) pre-allocate a/b arrays
+        a = np.zeros((n_max, len(wavelengths)), dtype=complex)
+        b = np.zeros_like(a)
+
+        # 5) loop over each wavelength & multipole order
+        for i, lam in enumerate(wavelengths):
+            # size params for this λ
+            xi1, xi2, xi3 = x1[i], x2[i], x3[i]
+
+            for n in range(1, n_max+1):
+                # --- Core–shell1 interface ---
+                u1 = m1*xi1
+                u2 = m2*xi1
+                ψ_u1   = self.psi(n, u1);   ψ_u1p  = self.deriv(self.psi, n, u1)
+                ψ_u2   = self.psi(n, u2);   ψ_u2p  = self.deriv(self.psi, n, u2)
+                ξ_u2   = self.xi(n,  u2);   ξ_u2p  = self.deriv(self.xi,  n, u2)
+
+                α = (m2*ψ_u2*ψ_u1p - m1*ψ_u1*ψ_u2p) \
+                  / (m2*ξ_u2*ψ_u1p   - m1*ψ_u1*ξ_u2p)
+
+                # --- shell1–shell2 interface ---
+                v1 = xi2
+                w1 = m2*xi2
+                v2 = xi2
+                w2 = m3*xi2
+
+                ψ_v1   = self.psi(n, v1);   ψ_v1p  = self.deriv(self.psi, n, v1)
+                ξ_v1   = self.xi(n,  v1);   ξ_v1p  = self.deriv(self.xi,  n, v1)
+                ψ_w2   = self.psi(n, w2);   ψ_w2p  = self.deriv(self.psi, n, w2)
+                ξ_w2   = self.xi(n,  w2);   ξ_w2p  = self.deriv(self.xi,  n, w2)
+
+                β = (m3*ψ_w2*(ψ_v1p - α*ξ_v1p) - ψ_v1*(ψ_w2p - α*ξ_u2p)) \
+                  / (m3*ψ_w2*(ξ_v1p - α*ξ_v1p) - ξ_v1*(ψ_w2p - α*ξ_u2p))
+
+                # --- shell2–medium interface (final a_n,b_n) ---
+                v = xi3
+                w = m3*xi3
+
+                ψ_v    = self.psi(n, v);    ψ_vp   = self.deriv(self.psi, n, v)
+                ξ_v    = self.xi(n,  v);    ξ_vp   = self.deriv(self.xi,  n, v)
+                ψ_w    = self.psi(n, w);    ψ_wp   = self.deriv(self.psi, n, w)
+
+                num_a = m3*ψ_w*(ψ_vp - β*ξ_vp)   - ψ_v*(ψ_wp - β*ξ_w2p)
+                den_a = m3*ψ_w*(ξ_vp - β*ξ_vp)   - ξ_v*(ψ_wp - β*ξ_w2p)
+                a[n-1, i] = num_a/den_a
+
+                num_b = ψ_w*(ψ_vp - m3*β*ξ_vp)   - m3*ψ_v*(ψ_wp - β*ξ_w2p)
+                den_b = ψ_w*(ξ_vp - m3*β*ξ_vp)   - m3*ξ_v*(ψ_wp - β*ξ_w2p)
+                b[n-1, i] = num_b/den_b
+
+        # 6) sum efficiencies (same as single_layer)
+        orders = np.arange(1, n_max+1)[:,None]
+        fact   = (2*orders + 1)
+        Q_sca = (2/(x3**2))*np.sum(fact*(np.abs(a)**2+np.abs(b)**2), axis=0)
+        Q_ext = (2/(x3**2))*np.sum(fact*np.real(a+b), axis=0)
         Q_abs = Q_ext - Q_sca
 
         return Q_sca, Q_abs

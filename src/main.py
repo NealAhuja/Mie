@@ -51,6 +51,19 @@ def main():
     print("Q_abs:", best_abs)
     print("fitness history:", history)
 
+    # 2-shell test (core + 2 shells)
+    Q2_sca, Q2_abs = solver.double_shell(
+        radius_core=40e-9,
+        radius_shell1=60e-9,
+        radius_shell2=80e-9,
+        m_core=1.6 + 0.2j,
+        m_shell1=1.4 + 0.05j,
+        m_shell2=1.5 + 0.1j,
+        wavelengths=wavelengths
+    )
+    print("double-shell Q_sca:", Q2_sca)
+    print("double-shell Q_abs:", Q2_abs)
+
     import matplotlib.pyplot as plt
 
     plt.figure(figsize=(6,4))
@@ -61,6 +74,9 @@ def main():
     plt.grid(True)
     plt.tight_layout()
     plt.show()
+
+
+
 
 if __name__ == "__main__":
     main()
