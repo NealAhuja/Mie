@@ -38,7 +38,7 @@ class Optimizer:
                 m_shell2=n_sh2 + 0j,
                 wavelengths=wavelengths,
             )
-            idx = np.argmin(np.abs(wavelengths - target))
+            idx = np.argmin(np.abs(wavelengths - target_peaks[0]))
             return Q_sca[idx]
 
         def on_generation(ga):

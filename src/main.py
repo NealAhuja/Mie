@@ -16,13 +16,9 @@ def main():
     # Initialize the solver
     solver = MieSolver()
 
-    # Define wavelengths to test
-    w1 = 400e-9
-    w2 = 600e-9
-    w3 = 800e-9
-
     #wavelengths = np.array([400e-9, 600e-9, 800e-9])
-    wavelengths = np.array([w1, w2, w3])
+    #wavelengths = np.array([w1, w2, w3])
+    wavelengths = np.linspace(400e-9, 800e-9, 3)
 
     # 1) Single-layer sphere test
     Q_sca, Q_abs = solver.single_layer(50e-9, 1.5+0.1j, wavelengths)
@@ -51,7 +47,7 @@ def main():
         20.0  # shell2 thickness (nm)
     ])
     best, sca, abs_, hist = opt.optimize_shell(
-        target_peaks=[650e-9],
+        target_peaks=[650e-9, 900e-9],
         initial_profile=init_profile,
         wavelengths=wavelengths
     )
