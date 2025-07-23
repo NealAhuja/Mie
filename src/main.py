@@ -5,12 +5,9 @@ from inverse_mie.optimizer import Optimizer
 def main():
     import sys
 
-    # 1) Ask the user for their medium (default to 1.0)
-    try:
-        n_med = float(input("Enter medium refractive index (e.g. 1.0 for air, 1.33 for water): ") or 1.0)
-    except ValueError:
-        print("Invalid number, using n_medium=1.0")
-        n_med = 1.0
+    # Enter Refractive Index of Medium
+    n_med = 1.00
+    print("Medium Index:", n_med)
 
     # 2) Initialize solver with that medium index
     solver = MieSolver(n_medium=n_med)
@@ -20,7 +17,12 @@ def main():
     solver = MieSolver()
 
     # Define wavelengths to test
-    wavelengths = np.array([400e-9, 600e-9, 800e-9])
+    w1 = 400e-9
+    w2 = 600e-9
+    w3 = 800e-9
+
+    #wavelengths = np.array([400e-9, 600e-9, 800e-9])
+    wavelengths = np.array([w1, w2, w3])
 
     # 1) Single-layer sphere test
     Q_sca, Q_abs = solver.single_layer(50e-9, 1.5+0.1j, wavelengths)
@@ -38,15 +40,22 @@ def main():
     print("core-shell Q_sca:", core_sca)
     print("core-shell Q_abs:", core_abs)
 
+    # GA optimizer test (6‐gene: core & two shells + core radius)
     opt = Optimizer(solver)
-    # 5‐gene profile: [core_n, shell1_n, shell2_n, shell1_thickness_nm, shell2_thickness_nm]
-    init_profile = np.array([1.5, 1.4, 1.5, 20.0, 20.0])
+    init_profile = np.array([
+        1.5,  # n_core
+        1.4,  # n_shell1
+        1.5,  # n_shell2
+        40.0,  # core radius (nm)
+        20.0,  # shell1 thickness (nm)
+        20.0  # shell2 thickness (nm)
+    ])
     best, sca, abs_, hist = opt.optimize_shell(
         target_peaks=[650e-9],
         initial_profile=init_profile,
         wavelengths=wavelengths
     )
-    print("optimized [n_core, n_sh1, n_sh2, t1_nm, t2_nm]:", best)
+    print("optimized [n_core, n_sh1, n_sh2, r_core_nm, t1_nm, t2_nm]:", best)
     print("Q_sca:", sca)
     print("Q_abs:", abs_)
     print("fitness history:", hist)
