@@ -8,28 +8,29 @@ class Optimizer:
         self.solver = solver
 
     def optimize_shell(
-            self,
-            target_peaks: Sequence[float],
-            initial_profile: np.ndarray,  # [n_core, n_sh1, n_sh2, r_core_nm, t1_nm, t2_nm]
-            wavelengths: np.ndarray,
+        self,
+        target_peaks: Sequence[float],
+        initial_profile: np.ndarray,
+        wavelengths: np.ndarray,
+        objective: str = "sca",    # new!
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
-        GA‐based optimization for a core + 2‐shell structure,
-        now including core radius as a gene.
-        initial_profile: [n_core, n_sh1, n_sh2, r_core_nm, shell1_thickness_nm, shell2_thickness_nm]
-        Returns (best_profile, Q_sca, Q_abs, fitness_history).
+        Runs GA to maximize either scattering (Q_sca) or absorption (Q_abs)
+        at the given target wavelengths (averaging over them).
+        objective: "sca" or "abs"
         """
+
         target = target_peaks[0]
         fitness_history = []
 
-        def fitness_func(ga, solution, _):
+        def fitness_func(ga, solution, idx):
             n_core, n_sh1, n_sh2, r_core_nm, t1_nm, t2_nm = solution
             # convert nm → m
             r_core = r_core_nm * 1e-9
             r_sh1 = r_core + t1_nm * 1e-9
             r_sh2 = r_sh1 + t2_nm * 1e-9
 
-            Q_sca, _ = self.solver.double_shell(
+            Q_sca, Q_abs = self.solver.double_shell(
                 radius_core=r_core,
                 radius_shell1=r_sh1,
                 radius_shell2=r_sh2,
@@ -38,9 +39,12 @@ class Optimizer:
                 m_shell2=n_sh2 + 0j,
                 wavelengths=wavelengths,
             )
+            # choose which metric to use
+            metric = Q_sca if objective == "sca" else Q_abs
+            # if two peaks:
             i0 = np.argmin(np.abs(wavelengths - target_peaks[0]))
             i1 = np.argmin(np.abs(wavelengths - target_peaks[1]))
-            return 0.5 * (Q_sca[i0] + Q_sca[i1])
+            return 0.5 * (metric[i0] + metric[i1])
 
         def on_generation(ga):
             fitness_history.append(ga.best_solution()[1])
@@ -62,6 +66,7 @@ class Optimizer:
             mutation_percent_genes=20,
             on_generation=on_generation
         )
+
         ga.run()
 
         best_sol, _, _ = ga.best_solution()

@@ -28,6 +28,9 @@ def main():
     )
     print("Core-shell Q_sca sample:", core_sca[:5])
 
+
+
+
     # 4) GA optimization (6-gene) for two peaks at 650 nm & 900 nm
     opt = Optimizer(solver)
     init_profile = np.array([1.5, 1.4, 1.5, 40.0, 20.0, 20.0])
@@ -40,6 +43,21 @@ def main():
     print(" best profile:", best)
     print(" Q_sca:", sca_opt)
     print(" Q_abs:", abs_opt)
+
+    # Right before calling the GA:
+
+    objective = 'sca'
+    print(objective)
+
+    best, sca_opt, abs_opt, hist = opt.optimize_shell(
+        target_peaks=[650e-9, 900e-9],
+        initial_profile=init_profile,
+        wavelengths=wavelengths,
+        objective=objective
+    )
+    print(f"Optimized for {objective.upper()}:")
+    print(" best profile:", best)
+    print(" result metric:", sca_opt if objective == "sca" else abs_opt)
 
     # 5) Convergence plot
     plt.figure(figsize=(6,4))
