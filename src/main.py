@@ -5,173 +5,140 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 def main():
-    # 1) Medium refractive index
+    # === User Settings ===
+    # Medium refractive index
     n_med = 1.00
-    print("Medium Index:", n_med)
+    # Target wavelengths for GA optimization (one or two entries)
+    TARGET_PEAKS = [ 650e-9]  # e.g. [650e-9] for single-peak
+    # Objective for GA: "sca" to maximize scattering, "abs" to maximize absorption
+    OBJECTIVE = "sca"
 
-    # 2) Initialize solver
+    print(f"Medium Index: {n_med}")
+    print(f"Optimizing for {', '.join(f'{tp*1e9:.0f}nm' for tp in TARGET_PEAKS)} ({OBJECTIVE.upper()})\n")
+
+    # Initialize solver
     solver = MieSolver(n_medium=n_med)
 
-    # 3) Quick wavelength grid for testing (7 points)
+    # Quick wavelength grid for testing
     wavelengths = np.linspace(400e-9, 1000e-9, 7)
 
     # --- Baseline checks ---
-    # Single-layer
-    Q_sca_single, Q_abs_single = solver.single_layer(50e-9, 1.5 + 0.1j, wavelengths)
+    Q_sca_single, Q_abs_single = solver.single_layer(50e-9, 1.5+0.1j, wavelengths)
     print("Single-layer Q_sca sample:", Q_sca_single[:5])
-
-    # Core-shell
     core_sca, core_abs = solver.core_shell(
         radius_core=40e-9, radius_shell=60e-9,
-        m_core=1.6 + 0.2j, m_shell=1.4 + 0.05j,
+        m_core=1.6+0.2j, m_shell=1.4+0.05j,
         wavelengths=wavelengths
     )
-    print("Core-shell Q_sca sample:", core_sca[:5])
+    print("Core-shell Q_sca sample:", core_sca[:5], "\n")
 
-
-
-
-    # 4) GA optimization (6-gene) for two peaks at 650 nm & 900 nm
+    # --- GA Optimization ---
     opt = Optimizer(solver)
-    init_profile = np.array([1.5, 1.4, 1.5, 40.0, 20.0, 20.0])
-    best, sca_opt, abs_opt, hist = opt.optimize_shell(
-        target_peaks=[650e-9, 900e-9],
-        initial_profile=init_profile,
-        wavelengths=wavelengths
-    )
-    print("\nOptimized for 650 nm & 900 nm:")
-    print(" best profile:", best)
-    print(" Q_sca:", sca_opt)
-    print(" Q_abs:", abs_opt)
-
-    # Right before calling the GA:
-
-    objective = 'sca'
-    print(objective)
+    init_profile = np.array([1.5, 1.4, 1.5, 40.0, 20.0, 20.0])  # core n, shell n's, core radius, shell thicknesses (nm)
 
     best, sca_opt, abs_opt, hist = opt.optimize_shell(
-        target_peaks=[650e-9, 900e-9],
+        target_peaks=TARGET_PEAKS,
         initial_profile=init_profile,
         wavelengths=wavelengths,
-        objective=objective
+        objective=OBJECTIVE
     )
-    print(f"Optimized for {objective.upper()}:")
-    print(" best profile:", best)
-    print(" result metric:", sca_opt if objective == "sca" else abs_opt)
+    print("Best profile:", best)
+    result_metric = sca_opt if OBJECTIVE == "sca" else abs_opt
+    print(f"Resulting {OBJECTIVE.upper()} spectrum sample:", result_metric[:5], "\n")
 
-    # 5) Convergence plot
-    plt.figure(figsize=(6,4))
+    # --- Convergence plot ---
+    plt.figure(figsize=(5,4))
     plt.plot(np.arange(1, len(hist)+1), hist, marker='o')
     plt.xlabel("Generation")
-    plt.ylabel("Best avg Q_sca (650 & 900 nm)")
+    plt.ylabel(f"Best avg Q_{OBJECTIVE}")
     plt.title("GA Convergence")
     plt.grid(True)
     plt.tight_layout()
     plt.show()
 
-    # 6) Automated sweep over first peak 500→800 nm, fix second at 900 nm
-    first_peaks = np.linspace(500e-9, 800e-9, 7)
-    fixed_second = 900e-9
+    # --- Automated Sweep ---
+    fixed_targets = TARGET_PEAKS[1:]
     sweep_results = []
-    for peak in first_peaks:
-        bp, _, _, _ = opt.optimize_shell(
-            target_peaks=[peak, fixed_second],
+    for peak in np.linspace(500e-9, 800e-9, 7):
+        targets = [peak] + fixed_targets
+        bp, sca_bp, abs_bp, _ = opt.optimize_shell(
+            target_peaks=targets,
             initial_profile=init_profile,
-            wavelengths=wavelengths
+            wavelengths=wavelengths,
+            objective=OBJECTIVE
         )
         sweep_results.append([peak*1e9, *bp])
 
-    # 7) Tabulate sweep
-    cols = ["peak_nm", "n_core", "n_sh1", "n_sh2", "r_core_nm", "t1_nm", "t2_nm"]
+    cols = ["peak_nm","n_core","n_sh1","n_sh2","r_core_nm","t1_nm","t2_nm"]
     df = pd.DataFrame(sweep_results, columns=cols)
-    print("\nSweep results:")
-    print(df.to_string(index=False))
+    print("Sweep results:")
+    print(df.to_string(index=False), "\n")
 
-    # 8) Design-rule fitting
+    # --- Design-Rule Fitting ---
     x = df["peak_nm"].values
-    y_core = df["r_core_nm"].values
-    y_t1   = df["t1_nm"].values
-    y_t2   = df["t2_nm"].values
+    rules = {}
+    for field in ["r_core_nm","t1_nm","t2_nm"]:
+        poly = np.polyfit(x, df[field].values, 1)
+        rules[field] = poly
+        print(f"{field} vs. peak: slope={poly[0]:.4e}, intercept={poly[1]:.4f}")
+    print()
 
-    p_core = np.polyfit(x, y_core, deg=1)
-    p_t1   = np.polyfit(x, y_t1,   deg=1)
-    p_t2   = np.polyfit(x, y_t2,   deg=1)
-
-    print("\nDesign‐rule coefficients (slope, intercept):")
-    print(f" Core radius vs. peak:      {p_core}")
-    print(f" Shell1 thickness vs. peak: {p_t1}")
-    print(f" Shell2 thickness vs. peak: {p_t2}")
-
-    # 9) Plot sweep design rules
-    plt.figure()
-    plt.plot(x, y_core,  "o-", label="core radius")
-    plt.plot(x, y_t1,    "s-", label="shell1 thickness")
-    plt.plot(x, y_t2,    "^-", label="shell2 thickness")
+    plt.figure(figsize=(5,4))
+    plt.plot(x, df["r_core_nm"], "o-", label="core radius")
+    plt.plot(x, df["t1_nm"],    "s-", label="shell1 thickness")
+    plt.plot(x, df["t2_nm"],    "^-", label="shell2 thickness")
     plt.xlabel("Target Peak #1 (nm)")
     plt.ylabel("Optimized size (nm)")
-    plt.title("Design Rules: layer thickness vs. LSPR")
     plt.legend()
+    plt.title("Design Rules")
     plt.tight_layout()
     plt.show()
 
-    # 10) Full-spectra plotting
-    wavelengths = np.linspace(400e-9, 1000e-9, 200)
-    # Baseline spectra
-    Q_sca_single, Q_abs_single = solver.single_layer(50e-9, 1.5 + 0.1j, wavelengths)
-    core_sca, core_abs = solver.core_shell(
-        radius_core=40e-9, radius_shell=60e-9,
-        m_core=1.6+0.2j,  m_shell=1.4+0.05j,
-        wavelengths=wavelengths
+    # --- Full Spectra Comparison ---
+    wavelengths_full = np.linspace(400e-9, 1000e-9, 200)
+    Qs_single, Qa_single = solver.single_layer(50e-9, 1.5+0.1j, wavelengths_full)
+    Qs_core,   Qa_core   = solver.core_shell(
+        40e-9,60e-9,1.6+0.2j,1.4+0.05j, wavelengths_full
     )
-    # Optimized double-shell spectra
-    n_core, n_sh1, n_sh2, r_core_nm, t1_nm, t2_nm = best
-    r_core = r_core_nm * 1e-9
-    r_sh1  = r_core    + t1_nm * 1e-9
-    r_sh2  = r_sh1     + t2_nm * 1e-9
-    opt_sca, opt_abs = solver.double_shell(
-        radius_core   = r_core,
-        radius_shell1 = r_sh1,
-        radius_shell2 = r_sh2,
-        m_core        = n_core+0j,
-        m_shell1      = n_sh1+0j,
-        m_shell2      = n_sh2+0j,
-        wavelengths   = wavelengths
+    n_core,n_sh1,n_sh2,r_core_nm,t1_nm,t2_nm = best
+    r_core = r_core_nm*1e-9
+    r_sh1  = r_core    + t1_nm*1e-9
+    r_sh2  = r_sh1     + t2_nm*1e-9
+    Qs_opt,  Qa_opt  = solver.double_shell(
+        r_core,r_sh1,r_sh2,
+        m_core=n_core+0j,
+        m_shell1=n_sh1+0j,
+        m_shell2=n_sh2+0j,
+        wavelengths=wavelengths_full
     )
 
-    # 11) Combined Q_sca plot
-    plt.figure(figsize=(6,4))
-    plt.plot(wavelengths*1e9, Q_sca_single, label="Single-layer")
-    plt.plot(wavelengths*1e9, core_sca,     label="Core-shell")
-    plt.plot(wavelengths*1e9, opt_sca,      label="Optimized double-shell")
+    # Combined Q_sca/Q_abs plot
+    plt.figure(figsize=(5,4))
+    plt.plot(wavelengths_full*1e9, Qs_single, label="Single-layer")
+    plt.plot(wavelengths_full*1e9, Qs_core,   label="Core-shell")
+    plt.plot(wavelengths_full*1e9, Qs_opt,    label="Optimized")
     plt.xlabel("Wavelength (nm)")
-    plt.ylabel("Scattering $Q_{sca}$")
+    ylabel = f"{'Scattering' if OBJECTIVE=='sca' else 'Absorption'} Q_{OBJECTIVE}"
+    plt.ylabel(ylabel)
     plt.title("Full Spectra Comparison")
     plt.legend()
-    plt.grid(True)
     plt.tight_layout()
     plt.show()
 
-    # 12) Standalone optimized Q_sca with targets
-    plt.figure(figsize=(6,4))
-    plt.plot(wavelengths*1e9, opt_sca, '-o', label='GA optimized')
-    plt.axvline(650, color='gray', linestyle='--', label='650 nm target')
-    plt.axvline(900, color='red',  linestyle='--', label='900 nm target')
+    # --- Standalone optimized spectrum with targets ---
+    plt.figure(figsize=(5,4))
+    if OBJECTIVE == 'sca':
+        metric = Qs_opt
+        ylabel2 = "Scattering efficiency $Q_{sca}$"
+    else:
+        metric = Qa_opt
+        ylabel2 = "Absorption efficiency $Q_{abs}$"
+    plt.plot(wavelengths_full*1e9, metric, '-o', label='Optimized')
+    for tp in TARGET_PEAKS:
+        plt.axvline(tp*1e9, color='gray', linestyle='--')
     plt.xlabel("Wavelength (nm)")
-    plt.ylabel("Scattering efficiency $Q_{sca}$")
-    plt.title("Optimized Particle Full $Q_{sca}$ Spectrum")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-
-    # 13) Combined Q_abs plot
-    plt.figure(figsize=(6,4))
-    plt.plot(wavelengths*1e9, Q_abs_single, label="Single-layer")
-    plt.plot(wavelengths*1e9, core_abs,     label="Core-shell")
-    plt.plot(wavelengths*1e9, opt_abs,      label="Optimized double-shell")
-    plt.xlabel("Wavelength (nm)")
-    plt.ylabel("Absorption $Q_{abs}$")
-    plt.title("Full Spectra Comparison")
+    plt.ylabel(ylabel2)
+    plt.title(f"Optimized Particle Full $Q_{{{OBJECTIVE}}}$ Spectrum")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()

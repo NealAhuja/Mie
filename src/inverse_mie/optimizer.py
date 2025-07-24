@@ -1,7 +1,7 @@
 from typing import Tuple, Sequence
 import numpy as np
 import pygad
-from .solver import MieSolver
+from inverse_mie.solver import MieSolver
 
 class Optimizer:
     def __init__(self, solver: MieSolver):
@@ -12,79 +12,64 @@ class Optimizer:
         target_peaks: Sequence[float],
         initial_profile: np.ndarray,
         wavelengths: np.ndarray,
-        objective: str = "sca",    # new!
+        objective: str = "sca",
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
-        Runs GA to maximize either scattering (Q_sca) or absorption (Q_abs)
-        at the given target wavelengths (averaging over them).
-        objective: "sca" or "abs"
-        """
+        GA‐based shell optimization.
 
-        target = target_peaks[0]
+        target_peaks : list of 1 or 2 wavelengths (in meters)
+        objective    : "sca" to maximize scattering, "abs" to maximize absorption
+        """
         fitness_history = []
 
-        def fitness_func(ga, solution, idx):
-            n_core, n_sh1, n_sh2, r_core_nm, t1_nm, t2_nm = solution
-            # convert nm → m
-            r_core = r_core_nm * 1e-9
-            r_sh1 = r_core + t1_nm * 1e-9
-            r_sh2 = r_sh1 + t2_nm * 1e-9
+        # This fitness function now handles 1 or more targets
+        def fitness_func(ga, solution, sol_idx):
+            # unpack core & shell refractive indices from the GA solution
+            m_core_val  = solution[0]
+            m_shell_val = solution[-1]
 
-            Q_sca, Q_abs = self.solver.double_shell(
-                radius_core=r_core,
-                radius_shell1=r_sh1,
-                radius_shell2=r_sh2,
-                m_core=n_core + 0j,
-                m_shell1=n_sh1 + 0j,
-                m_shell2=n_sh2 + 0j,
+            # compute the full spectra
+            Q_sca, Q_abs = self.solver.core_shell(
+                radius_core=40e-9,
+                radius_shell=60e-9,
+                m_core=m_core_val + 0j,
+                m_shell=m_shell_val + 0j,
                 wavelengths=wavelengths,
             )
-            # choose which metric to use
-            metric = Q_sca if objective == "sca" else Q_abs
-            # if two peaks:
-            i0 = np.argmin(np.abs(wavelengths - target_peaks[0]))
-            i1 = np.argmin(np.abs(wavelengths - target_peaks[1]))
-            return 0.5 * (metric[i0] + metric[i1])
 
-        def on_generation(ga):
-            fitness_history.append(ga.best_solution()[1])
+            # choose which metric to optimize
+            metric = Q_sca if objective == "sca" else Q_abs
+
+            # find the nearest indices for each target peak
+            inds = [int(np.argmin(np.abs(wavelengths - tp))) for tp in target_peaks]
+
+            # average the metric over all targets
+            return float(np.mean([metric[i] for i in inds]))
+
+        # record the best fitness each generation
+        def on_gen(ga_inst):
+            fitness_history.append(ga_inst.best_solution()[1])
 
         ga = pygad.GA(
             num_generations=30,
             sol_per_pop=10,
             num_parents_mating=4,
             fitness_func=fitness_func,
-            num_genes=6,
-            gene_space=[
-                {"low": 1.3, "high": 1.7},  # core index
-                {"low": 1.3, "high": 1.7},  # shell1 index
-                {"low": 1.3, "high": 1.7},  # shell2 index
-                {"low": 20.0, "high": 60.0},  # core radius in nm
-                {"low": 5.0, "high": 40.0},  # shell1 thickness in nm
-                {"low": 5.0, "high": 40.0},  # shell2 thickness in nm
-            ],
+            num_genes=initial_profile.size,
+            gene_space=[{"low": 1.3, "high": 1.7}] * initial_profile.size,
             mutation_percent_genes=20,
-            on_generation=on_generation
+            on_generation=on_gen,
         )
-
         ga.run()
 
-        best_sol, _, _ = ga.best_solution()
-        n_core_opt, n_sh1_opt, n_sh2_opt, r_core_opt, t1_opt, t2_opt = best_sol
-
-        # reconstruct radii and compute final spectra
-        r_core = r_core_opt * 1e-9
-        r_sh1 = r_core + t1_opt * 1e-9
-        r_sh2 = r_sh1 + t2_opt * 1e-9
-
-        best_Q_sca, best_Q_abs = self.solver.double_shell(
-            radius_core=r_core,
-            radius_shell1=r_sh1,
-            radius_shell2=r_sh2,
-            m_core=n_core_opt + 0j,
-            m_shell1=n_sh1_opt + 0j,
-            m_shell2=n_sh2_opt + 0j,
+        # get the final best solution
+        best_solution, _, _ = ga.best_solution()
+        best_Q_sca, best_Q_abs = self.solver.core_shell(
+            radius_core=40e-9,
+            radius_shell=60e-9,
+            m_core=best_solution[0] + 0j,
+            m_shell=best_solution[-1] + 0j,
             wavelengths=wavelengths,
         )
-        return best_sol, best_Q_sca, best_Q_abs, np.array(fitness_history)
 
+        return best_solution, best_Q_sca, best_Q_abs, np.array(fitness_history)
