@@ -22,7 +22,7 @@ def run_optimization(peak, fixed_targets, init_profile, wavelengths, objective, 
 def main():
     # === User Settings ===
     n_med = 1.00
-    TARGET_PEAKS = [650e-9]  # e.g. [650e-9] for single-peak
+    TARGET_PEAKS = [650e-9]
 
     # --- Optimization parameter bounds (user editable) ---
     N_LOW = 1.3

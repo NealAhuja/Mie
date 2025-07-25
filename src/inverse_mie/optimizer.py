@@ -15,12 +15,14 @@ class Optimizer:
             wavelengths: np.ndarray,
             bounds: dict = None,
             ga_params: dict = None,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+            weights: list = None,
+    ) -> Tuple[np.ndarray, np.ndarray, None, np.ndarray]:
         """
         GA‐based shell optimization.
 
         target_peaks : list of 1 or 2 wavelengths (in meters)
-        Always maximizes scattering efficiency (Q_sca)
+        weights      : list of weights (same length as target_peaks) for prioritizing each wavelength
+        Always maximizes weighted scattering efficiency (Q_sca)
         bounds       : dict with keys for n_low, n_high, r_core_min, r_core_max, t1_min, t1_max, t2_min, t2_max
         ga_params    : dict with keys for num_generations, sol_per_pop, num_parents_mating, mutation_percent_genes
         """
@@ -46,7 +48,12 @@ class Optimizer:
                 wavelengths=wavelengths,
             )
             inds = [int(np.argmin(np.abs(wavelengths - tp))) for tp in target_peaks]
-            return float(np.mean([Q_sca[i] for i in inds]))
+            # Use weights if provided, else equal weights
+            if weights is not None and len(weights) == len(inds):
+                w = np.array(weights) / np.sum(weights)
+                return float(np.sum(w * np.array([Q_sca[i] for i in inds])))
+            else:
+                return float(np.mean([Q_sca[i] for i in inds]))
 
         def on_gen(ga_inst):
             fitness_history.append(ga_inst.best_solution()[1])
