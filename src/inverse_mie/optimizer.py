@@ -36,7 +36,7 @@ class Optimizer:
             r_core = r_core_nm * 1e-9
             r_sh1 = r_core + t1_nm * 1e-9
             r_sh2 = r_sh1 + t2_nm * 1e-9
-            Q_sca, Q_abs = self.solver.double_shell(
+            Q_sca, _ = self.solver.double_shell(
                 radius_core=r_core,
                 radius_shell1=r_sh1,
                 radius_shell2=r_sh2,
@@ -116,7 +116,7 @@ class Optimizer:
         r_sh1 = r_core + t1_nm * 1e-9
         r_sh2 = r_sh1 + t2_nm * 1e-9
 
-        best_Q_sca, best_Q_abs = self.solver.double_shell(
+        best_Q_sca, _ = self.solver.double_shell(
             radius_core=r_core,
             radius_shell1=r_sh1,
             radius_shell2=r_sh2,
@@ -126,4 +126,4 @@ class Optimizer:
             wavelengths=wavelengths,
         )
 
-        return best_solution, best_Q_sca, best_Q_abs, np.array(fitness_history)
+        return best_solution, best_Q_sca, None, np.array(fitness_history)

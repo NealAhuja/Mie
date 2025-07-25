@@ -35,8 +35,8 @@ def main():
     T2_MAX = 50      # nm
 
     # --- Genetic Algorithm parameters (user editable) ---
-    NUM_GENERATIONS = 30
-    SOL_PER_POP = 10
+    NUM_GENERATIONS = 60
+    SOL_PER_POP = 20
     NUM_PARENTS_MATING = 4
     MUTATION_PERCENT_GENES = 20
 
@@ -76,7 +76,7 @@ def main():
         'mutation_percent_genes': MUTATION_PERCENT_GENES,
     }
 
-    best, sca_opt, abs_opt, hist = opt.optimize_shell(
+    best, sca_opt, _, hist = opt.optimize_shell(
         target_peaks=TARGET_PEAKS,
         initial_profile=init_profile,
         wavelengths=wavelengths,
@@ -84,6 +84,11 @@ def main():
         ga_params=ga_params
     )
     print("Best profile:", best)
+    # Print Q_sca at the target wavelengths
+    print("Scattering efficiency at target wavelengths:")
+    for tp in TARGET_PEAKS:
+        idx = int(np.argmin(np.abs(wavelengths - tp)))
+        print(f"  {tp*1e9:.1f} nm: Q_sca = {sca_opt[idx]:.3f}")
     print(f"Resulting scattering spectrum sample:", sca_opt[:5], "\n")
 
     # --- Standalone optimized spectrum with targets ---
@@ -92,7 +97,7 @@ def main():
     r_core = r_core_nm * 1e-9
     r_sh1 = r_core + t1_nm * 1e-9
     r_sh2 = r_sh1 + t2_nm * 1e-9
-    Qs_opt, Qa_opt = solver.double_shell(
+    Qs_opt, _ = solver.double_shell(
         r_core, r_sh1, r_sh2,
         m_core=n_core + 0j,
         m_shell1=n_sh1 + 0j,
